@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Resources Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            margin: 20px;
+            width: 90%;
+        }
+
+        .section {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            width: 45%;
+        }
+
+        h2 {
+            color: #007bff;
+            font-size: 1.5em;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .running {
+            color: green;
+        }
+
+        .failed {
+            color: red;
+        }
+
+        .pending {
+            color: orange;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Kubernetes Resources Dashboard</h1>
+    </header>
+    <div class="container">
+        <div class="section" id="pods-section">
+            <h2>Pods</h2>
+            <table id="pods-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Namespace</th>
+                        <th>IP</th>
+                        <th>Status</th>
+                        <th>Logs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Pod data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="section" id="services-section">
+            <h2>Services</h2>
+            <table id="services-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Namespace</th>
+                        <th>Type</th>
+                        <th>Endpoints</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Service data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Function to fetch resource status and update the DOM
+        async function fetchResources() {
+            try {
+                const response = await fetch('/resources');
+                const data = await response.json();
+
+                // Update Pods Table
+                const podsTableBody = document.querySelector('#pods-table tbody');
+                podsTableBody.innerHTML = '';  // Clear existing data
+                data.pods.forEach(pod => {
+                    const podRow = document.createElement('tr');
+                    podRow.innerHTML = `
+                        <td>${pod.name}</td>
+                        <td>${pod.namespace}</td>
+                        <td>${pod.ip || 'N/A'}</td>
+                        <td class="status ${pod.status.toLowerCase()}">${pod.status}</td>
+                        <td><button onclick="openLogs('${pod.namespace}', '${pod.name}')">View Logs</button></td>
+                    `;
+                    podsTableBody.appendChild(podRow);
+                });
+
+                // Update Services Table
+                const servicesTableBody = document.querySelector('#services-table tbody');
+                servicesTableBody.innerHTML = '';  // Clear existing data
+                data.services.forEach(service => {
+                    const endpoints = service.endpoints ? service.endpoints.join(', ') : 'N/A';
+                    const serviceRow = document.createElement('tr');
+                    serviceRow.innerHTML = `
+                        <td>${service.name}</td>
+                        <td>${service.namespace}</td>
+                        <td>${service.type}</td>
+                        <td>${endpoints}</td>
+                    `;
+                    servicesTableBody.appendChild(serviceRow);
+                });
+
+            } catch (error) {
+                console.error('Error fetching resources:', error);
+            }
+        }
+
+        // Polling every 2 seconds to fetch resources
+        setInterval(fetchResources, 2000);
+
+        // Function to open logs in a new window
+        function openLogs(namespace, podName) {
+            const logWindow = window.open('', '_blank', 'width=800,height=600');
+            logWindow.document.write(`
+                <html>
+                <head>
+                    <title>Logs for ${podName}</title>
+                </head>
+                <body>
+                    <h1>Logs for Pod: ${podName}</h1>
+                    <pre id="logs-content">Loading logs...</pre>
+                    <script>
+                        function fetchLogs() {
+                            fetch('/logs?namespace=${namespace}&pod=${podName}')
+                                .then(response => response.text())
+                                .then(logs => {
+                                    document.getElementById('logs-content').textContent = logs;
+                                })
+                                .catch(error => {
+                                    document.getElementById('logs-content').textContent = 'Error fetching logs';
+                                    console.error('Error fetching logs:', error);
+                                });
+                        }
+                        setInterval(fetchLogs, 1000);  // Refresh logs every second
+                    </script>
+                </body>
+                </html>
+            `);
+        }
+    </script>
+</body>
+</html>
